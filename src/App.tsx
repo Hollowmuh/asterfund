@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import ManageFunds from "./pages/ManageFunds";
+import { WalletStatus  } from "@componenets/shared/WalletStatus";
 
 const queryClient = new QueryClient();
 
