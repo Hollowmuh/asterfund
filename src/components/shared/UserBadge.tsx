@@ -1,23 +1,39 @@
+import React from 'react';
 import { Badge } from '@/components/ui/badge';
+import { Shield } from 'lucide-react';
 
-interface UserBadgeProps {
-  level: number;
-  totalInvested: number;
-}
+const BADGE_STYLES = {
+  BRONZE: {
+    background: 'from-orange-700 to-orange-900',
+    icon: 'text-orange-400'
+  },
+  SILVER: {
+    background: 'from-gray-400 to-gray-600',
+    icon: 'text-gray-200'
+  },
+  GOLD: {
+    background: 'from-yellow-400 to-yellow-600',
+    icon: 'text-yellow-300'
+  },
+  DIAMOND: {
+    background: 'from-blue-400 to-blue-600',
+    icon: 'text-blue-200'
+  },
+  PLATINUM: {
+    background: 'from-purple-400 to-purple-600',
+    icon: 'text-purple-200'
+  }
+};
 
-export function UserBadge({ level, totalInvested }: UserBadgeProps) {
-  const getBadgeLevel = () => {
-    if (totalInvested >= 100000) return { name: 'Diamond', color: 'from-purple-400 to-pink-500' };
-    if (totalInvested >= 50000) return { name: 'Gold', color: 'from-yellow-400 to-orange-500' };
-    if (totalInvested >= 10000) return { name: 'Silver', color: 'from-gray-400 to-gray-500' };
-    return { name: 'Bronze', color: 'from-orange-400 to-red-500' };
-  };
-
-  const badge = getBadgeLevel();
-
+export function BadgeDisplay({ level }: { level: string }) {
+  const style = BADGE_STYLES[level as keyof typeof BADGE_STYLES];
+  
   return (
-    <Badge className={`bg-gradient-to-r ${badge.color}`}>
-      {badge.name} Investor
+    <Badge 
+      className={`bg-gradient-to-r ${style.background} animate-gradient flex items-center gap-2`}
+    >
+      <Shield className={`h-4 w-4 ${style.icon}`} />
+      {level.charAt(0) + level.slice(1).toLowerCase()} Investor
     </Badge>
   );
 }

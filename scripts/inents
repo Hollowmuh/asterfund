@@ -1,0 +1,805 @@
+// Contract Integration Details
+
+// 1. CORE CONTRACT INTERFACES
+
+interface Investment {
+  amount: number;
+  currentValue: number;
+  timestamp: number;
+  lockedUntil: number;
+  category: InvestmentCategory;
+}
+
+enum InvestmentCategory {
+  CRYPTO,
+  STOCKS,
+  COMMODITIES,
+  BONDS
+}
+
+enum BadgeLevel {
+  BRONZE,
+  SILVER,
+  GOLD,
+  DIAMOND,
+  PLATINUM
+}
+
+interface InvestorStats {
+  totalInvested: number;
+  currentTotal: number;
+  unrealizedProfit: number;
+  realizedProfit: number;
+  totalFeePaid: number;
+  badgeLevel: BadgeLevel;
+  investmentCount: number;
+}
+
+interface FundMetrics {
+  tvl: number;
+  peakTvl: number;
+  totalInvestors: number;
+  activeInvestors: number;
+  categoryTotals: number[];
+  avgInvestmentSize: number;
+}
+
+// 2. CONTRACT EVENTS AND HANDLERS
+
+interface ContractEvents {
+  WithdrawalEvent: {
+    investor: string;
+    amount: number;
+    profit: number;
+  };
+  
+  FeesCollectedEvent: {
+    amount: number;
+    feeType: number;
+  };
+  
+  PerformanceUpdate: {
+    timestamp: number;
+    totalValue: number;
+    dailyChange: number;
+    activeInvestors: number;
+  };
+  
+  InvestmentPerformance: {
+    investor: string;
+    investmentId: number;
+    previousValue: number;
+    newValue: number;
+    timestamp: number;
+  };
+  
+  BadgeLevelChange: {
+    investor: string;
+    previousLevel: BadgeLevel;
+    newLevel: BadgeLevel;
+  };
+  
+  NewPeakTVL: {
+    timestamp: number;
+    amount: number;
+  };
+}
+
+// 3. INTEGRATION POINTS
+
+// A. Dashboard Page Integration
+interface DashboardIntegration {
+  // Main dashboard metrics
+  getInvestorStats: () => Promise<InvestorStats>;
+  getFundMetrics: () => Promise<FundMetrics>;
+  getHistoricalPerformance: (daysBack: number) => Promise<{
+    values: number[];
+    investorsCount: number[];
+  }>;
+  getInvestorROI: () => Promise<{
+    totalROI: number;
+    annualizedROI: number;
+  }>;
+  
+  // Event subscriptions
+  subscribeToPerformanceUpdates: () => void;
+  subscribeToInvestmentPerformance: () => void;
+  subscribeToBadgeLevelChanges: () => void;
+  subscribeToNewPeakTVL: () => void;
+}
+
+// B. Manage Funds Page Integration
+interface ManageFundsIntegration {
+  // Transaction functions
+  createLockedInvestment: (
+    amount: number,
+    lockDuration: number,
+    category: InvestmentCategory
+  ) => Promise<void>;
+  
+  withdraw: (amount: number) => Promise<void>;
+  
+  // Investment tracking
+  getInvestorInvestments: () => Promise<Investment[]>;
+  
+  // Event subscriptions
+  subscribeToWithdrawalEvents: () => void;
+  subscribeToFeesCollectedEvents: () => void;
+}
+
+// 4. IMPLEMENTATION REQUIREMENTS
+
+/**
+ * Dashboard Integration Requirements:
+ * 
+ * 1. Real-time updates:
+ *    - Subscribe to PerformanceUpdate events for chart updates
+ *    - Subscribe to BadgeLevelChange for badge updates
+ *    - Subscribe to NewPeakTVL for milestone notifications
+ * 
+ * 2. Data display:
+ *    - Show current badge level from BadgeLevel enum
+ *    - Display TVL and peak TVL from getFundMetrics
+ *    - Show ROI calculations from getInvestorROI
+ *    - Present historical performance in line chart
+ * 
+ * 3. Category breakdown:
+ *    - Show investment distribution across categories
+ *    - Update in real-time with InvestmentPerformance events
+ * 
+ * ManageFunds Integration Requirements:
+ * 
+ * 1. Transaction handling:
+ *    - Implement createLockedInvestment for deposits
+ *    - Handle withdraw function for withdrawals
+ *    - Show transaction status and confirmations
+ * 
+ * 2. Investment tracking:
+ *    - Display current investments from getInvestorInvestments
+ *    - Show lock periods and maturity dates
+ *    - Update balances real-time with events
+ * 
+ * 3. Fee handling:
+ *    - Display management and performance fees
+ *    - Show fee collection events
+ *    - Calculate and display fee projections
+ */
+
+// 5. UTILITY FUNCTIONS
+
+const formatWeiToEther = (wei: string): number => {
+  return Number(ethers.utils.formatEther(wei));
+};
+
+const formatEtherToWei = (ether: number): string => {
+  return ethers.utils.parseEther(ether.toString()).toString();
+};
+
+// 6. ERROR HANDLING
+
+enum ContractError {
+  INSUFFICIENT_BALANCE = "Insufficient balance",
+  FUNDS_LOCKED = "Funds are still locked",
+  MINIMUM_INVESTMENT = "Amount below minimum investment",
+  MAXIMUM_INVESTMENT = "Amount above maximum investment",
+  INVALID_CATEGORY = "Invalid investment category"
+}
+
+const handleContractError = (error: any): string => {
+  // Extract error message from contract revert
+  const errorMessage = error.reason || error.message;
+  
+  // Map to user-friendly messages
+  const errorMap: Record<string, string> = {
+    [ContractError.INSUFFICIENT_BALANCE]: "You don't have enough funds for this transaction",
+    [ContractError.FUNDS_LOCKED]: "These funds are still in their lock period",
+    [ContractError.MINIMUM_INVESTMENT]: "The minimum investment amount is not met",
+    [ContractError.MAXIMUM_INVESTMENT]: "The investment amount exceeds the maximum allowed",
+    [ContractError.INVALID_CATEGORY]: "Please select a valid investment category"
+  };
+  
+  return errorMap[errorMessage] || "Transaction failed. Please try again.";
+};
+
+// 7. EVENT LISTENERS
+
+const setupEventListeners = (contract: ethers.Contract, address: string) => {
+  contract.on("WithdrawalEvent", (investor, amount, profit) => {
+    if (investor === address) {
+      // Update UI with withdrawal confirmation
+      // Refresh balances
+      // Show profit realization
+    }
+  });
+  
+  contract.on("PerformanceUpdate", (timestamp, totalValue, dailyChange, activeInvestors) => {
+    // Update dashboard metrics
+    // Refresh charts
+    // Update performance indicators
+  });
+  
+  contract.on("BadgeLevelChange", (investor, previousLevel, newLevel) => {
+    if (investor === address) {
+      // Update badge display
+      // Show achievement notification
+      // Update investor status
+    }
+  });
+  
+  // Additional event listeners as needed
+};
+
+---------------------------------------------------------------------------------------------------------------------------------
+// 1. First, let's create the contract hooks and types
+
+// types.ts
+export interface FirmStats {
+  totalFunds: number;
+  currentValue: number;
+  investors: number;
+  fees: number;
+  categoryInvestments: {
+    [key: string]: number;
+  };
+}
+
+// hooks/useContractData.ts
+import { useState, useEffect } from 'react';
+import { ethers } from 'ethers';
+import { useWalletStore } from '@/store/useWalletStore';
+
+export const useContractData = () => {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [firmStats, setFirmStats] = useState<FirmStats | null>(null);
+  
+  const contract = useWalletStore(state => state.contract);
+
+  const getFirmMetrics = async () => {
+    try {
+      const metrics = await contract.getFundMetrics();
+      const managementFee = await contract.MANAGEMENT_FEE_BPS();
+      
+      return {
+        totalFunds: ethers.utils.formatEther(metrics.tvl),
+        currentValue: ethers.utils.formatEther(metrics.tvl),
+        investors: metrics.totalInvestors.toNumber(),
+        fees: (managementFee.toNumber() / 10000), // Convert from basis points
+        categoryInvestments: {
+          crypto: ethers.utils.formatEther(metrics.categoryTotals[0]),
+          stocks: ethers.utils.formatEther(metrics.categoryTotals[1]),
+          realEstate: ethers.utils.formatEther(metrics.categoryTotals[2])
+        }
+      };
+    } catch (err) {
+      console.error('Error fetching firm metrics:', err);
+      throw err;
+    }
+  };
+
+  useEffect(() => {
+    if (contract) {
+      const loadData = async () => {
+        try {
+          setLoading(true);
+          const data = await getFirmMetrics();
+          setFirmStats(data);
+        } catch (err) {
+          setError('Failed to load firm data');
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      loadData();
+
+      // Subscribe to events
+      const performanceListener = contract.on('PerformanceUpdate', 
+        (timestamp, totalValue, dailyChange, activeInvestors) => {
+          loadData(); // Refresh data on performance update
+      });
+
+      return () => {
+        contract.off('PerformanceUpdate', performanceListener);
+      };
+    }
+  }, [contract]);
+
+  return { firmStats, loading, error };
+};
+
+// hooks/useTransactions.ts
+import { useCallback } from 'react';
+import { ethers } from 'ethers';
+
+export const useTransactions = () => {
+  const contract = useWalletStore(state => state.contract);
+  const { toast } = useToast();
+
+  const createInvestment = useCallback(async (
+    amount: number,
+    lockDuration: number = 30 * 24 * 60 * 60, // 30 days in seconds
+    category: number = 0 // Default to CRYPTO
+  ) => {
+    try {
+      const amountInWei = ethers.utils.parseEther(amount.toString());
+      const tx = await contract.createLockedInvestment(
+        amountInWei,
+        lockDuration,
+        category,
+        { value: amountInWei }
+      );
+      await tx.wait();
+      return true;
+    } catch (err) {
+      console.error('Investment creation failed:', err);
+      throw err;
+    }
+  }, [contract]);
+
+  const withdraw = useCallback(async (amount: number) => {
+    try {
+      const amountInWei = ethers.utils.parseEther(amount.toString());
+      const tx = await contract.withdraw(amountInWei);
+      await tx.wait();
+      return true;
+    } catch (err) {
+      console.error('Withdrawal failed:', err);
+      throw err;
+    }
+  }, [contract]);
+
+  return { createInvestment, withdraw };
+};
+
+// 2. Updated HomePage Component
+export function HomePage() {
+  const { firmStats, loading, error } = useContractData();
+  const navigate = useNavigate();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 flex items-center justify-center">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  return (
+    // ... existing JSX but using firmStats instead of mock data ...
+  );
+}
+
+// 3. Updated FundsForm Component
+export function FundsForm({ maxWithdrawal = 0 }: FundsFormProps) {
+  const { createInvestment, withdraw } = useTransactions();
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+
+  const handleTransaction = async (type: 'deposit' | 'withdraw', amount: number) => {
+    setLoading(true);
+    try {
+      if (type === 'deposit') {
+        await createInvestment(amount);
+        handleSuccess('Investment created successfully!');
+      } else {
+        await withdraw(amount);
+        handleSuccess('Withdrawal processed successfully!');
+      }
+      setAmount('');
+    } catch (err: any) {
+      let errorMessage = 'Transaction failed. Please try again.';
+      
+      // Handle specific contract errors
+      if (err.reason) {
+        switch (err.reason) {
+          case 'Amount below minimum investment':
+            errorMessage = 'The amount is below the minimum investment requirement';
+            break;
+          case 'Funds still locked':
+            errorMessage = 'Your funds are still in the lock period';
+            break;
+          case 'Invalid withdrawal amount':
+            errorMessage = 'Invalid withdrawal amount';
+            break;
+        }
+      }
+      
+      toast({
+        title: 'Transaction Failed',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    // ... existing JSX using the new handleTransaction ...
+  );
+}
+
+// 4. Contract Event Handlers
+const setupEventListeners = (contract: ethers.Contract) => {
+  contract.on('WithdrawalEvent', (investor, amount, profit) => {
+    console.log(`Withdrawal: ${ethers.utils.formatEther(amount)} ETH`);
+  });
+
+  contract.on('PerformanceUpdate', (timestamp, totalValue, dailyChange, activeInvestors) => {
+    console.log(`New total value: ${ethers.utils.formatEther(totalValue)} ETH`);
+  });
+
+  contract.on('BadgeLevelChange', (investor, previousLevel, newLevel) => {
+    toast({
+      title: 'Badge Level Updated!',
+      description: `You've achieved ${BadgeLevel[newLevel]} status!`,
+      variant: 'default',
+    });
+  });
+
+  return () => {
+    contract.removeAllListeners();
+  };
+};
+
+-------------------------------------------------------------------------------------------------------------------------------
+// store/useWalletStore.ts
+import { create } from 'zustand';
+import { ethers } from 'ethers';
+import FundTrackerABI from '@/contracts/FundTracker.json';
+
+interface WalletState {
+  account: string | null;
+  balance: number;
+  contract: ethers.Contract | null;
+  provider: ethers.providers.Web3Provider | null;
+  isConnecting: boolean;
+  error: string | null;
+  badges: {
+    current: BadgeLevel;
+    progress: number;
+  };
+  transactions: Transaction[];
+  
+  // Methods
+  connect: () => Promise<void>;
+  disconnect: () => void;
+  addTransaction: (type: string, amount: number) => void;
+  updateBadge: (level: BadgeLevel) => void;
+  refreshBalance: () => Promise<void>;
+}
+
+interface Transaction {
+  type: string;
+  amount: number;
+  timestamp: string;
+  status: string;
+  hash?: string;
+}
+
+const FUND_TRACKER_ADDRESS = process.env.REACT_APP_CONTRACT_ADDRESS;
+
+export const useWalletStore = create<WalletState>((set, get) => ({
+  account: null,
+  balance: 0,
+  contract: null,
+  provider: null,
+  isConnecting: false,
+  error: null,
+  badges: {
+    current: BadgeLevel.BRONZE,
+    progress: 0
+  },
+  transactions: [],
+
+  connect: async () => {
+    set({ isConnecting: true, error: null });
+    
+    try {
+      if (!window.ethereum) {
+        throw new Error('Metamask not installed');
+      }
+
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      await provider.send('eth_requestAccounts', []);
+      
+      const signer = provider.getSigner();
+      const account = await signer.getAddress();
+      const balance = parseFloat(ethers.utils.formatEther(
+        await provider.getBalance(account)
+      ));
+
+      const contract = new ethers.Contract(
+        FUND_TRACKER_ADDRESS!,
+        FundTrackerABI.abi,
+        signer
+      );
+
+      // Set up contract event listeners
+      setupContractListeners(contract, account);
+
+      set({
+        account,
+        balance,
+        contract,
+        provider,
+        isConnecting: false
+      });
+
+      // Initial data load
+      await get().refreshBalance();
+      
+    } catch (err: any) {
+      set({ 
+        error: err.message || 'Failed to connect wallet',
+        isConnecting: false 
+      });
+    }
+  },
+
+  disconnect: () => {
+    const { contract } = get();
+    if (contract) {
+      contract.removeAllListeners();
+    }
+    
+    set({
+      account: null,
+      balance: 0,
+      contract: null,
+      provider: null,
+      error: null
+    });
+  },
+
+  addTransaction: (type: string, amount: number) => {
+    const transaction: Transaction = {
+      type,
+      amount,
+      timestamp: new Date().toISOString(),
+      status: 'completed'
+    };
+
+    set(state => ({
+      transactions: [transaction, ...state.transactions]
+    }));
+  },
+
+  updateBadge: (level: BadgeLevel) => {
+    set(state => ({
+      badges: {
+        ...state.badges,
+        current: level
+      }
+    }));
+  },
+
+  refreshBalance: async () => {
+    const { provider, account, contract } = get();
+    if (!provider || !account || !contract) return;
+
+    try {
+      const balance = parseFloat(ethers.utils.formatEther(
+        await provider.getBalance(account)
+      ));
+
+      const investorStats = await contract.getInvestorStats(account);
+      
+      set({ 
+        balance,
+        badges: {
+          current: investorStats.badgeLevel,
+          progress: calculateBadgeProgress(investorStats)
+        }
+      });
+    } catch (err) {
+      console.error('Failed to refresh balance:', err);
+    }
+  }
+}));
+
+// Helper functions
+const calculateBadgeProgress = (stats: any) => {
+  const thresholds = {
+    [BadgeLevel.BRONZE]: 0,
+    [BadgeLevel.SILVER]: 500,
+    [BadgeLevel.GOLD]: 1000,
+    [BadgeLevel.DIAMOND]: 100000,
+    [BadgeLevel.PLATINUM]: 1000000
+  };
+
+  const currentLevel = stats.badgeLevel;
+  const nextLevel = currentLevel + 1;
+  
+  if (nextLevel >= BadgeLevel.PLATINUM) return 100;
+
+  const currentThreshold = thresholds[currentLevel];
+  const nextThreshold = thresholds[nextLevel];
+  const progress = ((stats.totalInvested - currentThreshold) / 
+    (nextThreshold - currentThreshold)) * 100;
+
+  return Math.min(Math.max(progress, 0), 100);
+};
+
+const setupContractListeners = (
+  contract: ethers.Contract, 
+  account: string
+) => {
+  contract.on('WithdrawalEvent', 
+    (investor: string, amount: ethers.BigNumber, profit: ethers.BigNumber) => {
+      if (investor.toLowerCase() === account.toLowerCase()) {
+        useWalletStore.getState().refreshBalance();
+        useWalletStore.getState().addTransaction(
+          'withdraw',
+          parseFloat(ethers.utils.formatEther(amount))
+        );
+      }
+  });
+
+  contract.on('BadgeLevelChange',
+    (investor: string, previousLevel: number, newLevel: number) => {
+      if (investor.toLowerCase() === account.toLowerCase()) {
+        useWalletStore.getState().updateBadge(newLevel);
+      }
+  });
+
+  // Add other event listeners as needed
+};
+
+// components/shared/WalletConnect.tsx
+export function WalletConnect() {
+  const { connect, disconnect, account, isConnecting, error } = useWalletStore();
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-b from-gray-900 to-gray-800">
+      <Card className="w-full max-w-md backdrop-blur-sm bg-white/10 border-none">
+        <CardHeader>
+          <CardTitle>Connect Wallet</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          
+          {account ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
+                <span className="text-sm text-gray-400">Connected:</span>
+                <span className="font-mono">
+                  {account.slice(0, 6)}...{account.slice(-4)}
+                </span>
+              </div>
+              <Button 
+                variant="outline" 
+                onClick={disconnect}
+                className="w-full"
+              >
+                Disconnect Wallet
+              </Button>
+            </div>
+          ) : (
+            <Button
+              onClick={connect}
+              disabled={isConnecting}
+              className="w-full bg-gradient-to-r from-blue-500 to-teal-500"
+            >
+              {isConnecting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Connecting...
+                </>
+              ) : (
+                <>
+                  <Wallet className="mr-2 h-4 w-4" />
+                  Connect Metamask
+                </>
+              )}
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+---------------------------------------------------------------------------------------------------------------------------------
+// components/shared/ContractEventNotifier.tsx
+import { useEffect } from 'react';
+import { useToast } from '@/components/ui/use-toast';
+import { useWalletStore } from '@/store/useWalletStore';
+import { BadgeLevel } from '@/types';
+
+export function ContractEventNotifier() {
+  const { contract, account } = useWalletStore();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (!contract || !account) return;
+
+    const handleBadgeChange = (
+      investor: string,
+      previousLevel: number,
+      newLevel: number
+    ) => {
+      if (investor.toLowerCase() === account.toLowerCase()) {
+        toast({
+          title: '🎉 Achievement Unlocked!',
+          description: `Congratulations! You've reached ${BadgeLevel[newLevel]} status!`,
+          duration: 5000,
+        });
+      }
+    };
+
+    const handleNewPeakTVL = (
+      timestamp: number,
+      amount: ethers.BigNumber
+    ) => {
+      toast({
+        title: '🚀 New Peak TVL!',
+        description: `The fund has reached a new peak of $${
+          parseFloat(ethers.utils.formatEther(amount)).toLocaleString()
+        }!`,
+        duration: 3000,
+      });
+    };
+
+    const handlePerformanceUpdate = (
+      timestamp: number,
+      totalValue: ethers.BigNumber,
+      dailyChange: ethers.BigNumber,
+      activeInvestors: number
+    ) => {
+      const changePercent = parseFloat(ethers.utils.formatEther(dailyChange));
+      if (Math.abs(changePercent) >= 5) { // Only notify on significant changes
+        toast({
+          title: changePercent > 0 ? '📈 Strong Performance' : '📉 Market Alert',
+          description: `Fund value has changed by ${changePercent.toFixed(2)}% today`,
+          duration: 3000,
+          variant: changePercent > 0 ? 'default' : 'destructive',
+        });
+      }
+    };
+
+    // Set up event listeners
+    contract.on('BadgeLevelChange', handleBadgeChange);
+    contract.on('NewPeakTVL', handleNewPeakTVL);
+    contract.on('PerformanceUpdate', handlePerformanceUpdate);
+
+    // Cleanup
+    return () => {
+      contract.off('BadgeLevelChange', handleBadgeChange);
+      contract.off('NewPeakTVL', handleNewPeakTVL);
+      contract.off('PerformanceUpdate', handlePerformanceUpdate);
+    };
+  }, [contract, account, toast]);
+
+  return null; // This is a purely functional component
+}
+
+// Add to App.tsx
+export default function App() {
+  return (
+    <>
+      <ContractEventNotifier />
+      <Router>
+        {/* ... existing routes ... */}
+      </Router>
+      <Toaster />
+    </>
+  );
+}
